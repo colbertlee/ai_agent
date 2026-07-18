@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .container { width: 100%; max-width: 800px; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); display: flex; flex-direction: column; height: 80vh; overflow: hidden; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 20px; }
+        .header-right { display: flex; gap: 8px; }
+        .header-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 6px 12px; border-radius: 16px; cursor: pointer; font-size: 13px; }
+        .chat-area { flex: 1; overflow-y: auto; padding: 20px; background: #f8f9fa; }
+        .message { margin-bottom: 16px; display: flex; gap: 10px; }
+        .message.user { justify-content: flex-end; }
+        .message.user .content { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 16px 16px 4px 16px; }
+        .message.ai { justify-content: flex-start; }
+        .message.ai .content { background: white; color: #333; border-radius: 16px 16px 16px 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .message .avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 16px; flex-shrink: 0; }
+        .message.user .avatar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .message.ai .avatar { background: #e9ecef; color: #667eea; }
+        .message .content { max-width: 70%; padding: 10px 14px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+        .typing-indicator { display: flex; gap: 4px; padding: 10px 14px; background: white; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 16px; width: fit-content; }
+        .typing-indicator span { width: 6px; height: 6px; background: #667eea; border-radius: 50%; animation: typing 1.4s infinite ease-in-out both; }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typing { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+        .input-area { padding: 16px 20px; background: white; border-top: 1px solid #e9ecef; display: flex; gap: 10px; }
+        .input-area textarea { flex: 1; padding: 12px 14px; border: 2px solid #e9ecef; border-radius: 16px; font-size: 14px; resize: none; outline: none; min-height: 44px; max-height: 100px; }
+        .input-area textarea:focus { border-color: #667eea; }
+        .send-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white; padding: 12px 20px; border-radius: 16px; cursor: pointer; font-size: 14px; font-weight: 600; }
+        .send-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(102,126,234,0.4); }
+        .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .status-bar { background: #e9ecef; padding: 6px 16px; font-size: 12px; color: #666; text-align: center; }
+        .status-bar.online { background: #d4edda; color: #155724; }
+        .status-bar.error { background: #f8d7da; color: #721c24; }
+        .panel { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); padding: 24px; max-width: 450px; width: 90%; z-index: 1000; display: none; }
+        .panel.active { display: block; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; display: none; }
+        .overlay.active { display: block; }
+        .close-btn { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 24px; cursor: pointer; color: #999; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 6px; font-weight: 500; }
+        .form-group input { width: 100%; padding: 12px 14px; border: 2px solid #e9ecef; border-radius: 12px; font-size: 14px; outline: none; font-family: monospace; }
+        .form-group input:focus { border-color: #667eea; }
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-group button { flex: 1; padding: 12px; border-radius: 12px; font-size: 14px; cursor: pointer; }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white; }
+        .btn-secondary { background: #f8f9fa; border: 1px solid #e9ecef; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AI Agent</h1>
+            <div class="header-right">
+                <button class="header-btn" onclick="toggleSettings()">Settings</button>
+            </div>
+        </div>
+        <div class="status-bar" id="statusBar">Connecting...</div>
+        <div class="chat-area" id="chatArea">
+            <div class="message ai">
+                <div class="avatar">AI</div>
+                <div class="content">Hello! I am your AI Assistant. Please configure your OpenAI API Key in Settings.</div>
+            </div>
+        </div>
+        <div class="input-area">
+            <textarea id="messageInput" placeholder="Type your message..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+    <div class="overlay" id="overlay" onclick="closeSettings()"></div>
+    <div class="panel" id="settingsPanel">
+        <button class="close-btn" onclick="closeSettings()">x</button>
+        <h2>Settings</h2>
+        <div class="form-group">
+            <label>OpenAI API Key</label>
+            <input type="password" id="apiKeyInput" placeholder="sk-...">
+        </div>
+        <div class="btn-group">
+            <button class="btn-secondary" onclick="closeSettings()">Cancel</button>
+            <button class="btn-primary" onclick="saveApiKey()">Save</button>
+        </div>
+    </div>
+    <script>
+        let ws = null;
+        function init() {
+            ws = new WebSocket(`ws://${location.host}/api/chat/stream`);
+            ws.onopen = () => { document.getElementById('statusBar').className='status-bar online'; document.getElementById('statusBar').textContent='Connected'; };
+            ws.onmessage = (e) => { const d = JSON.parse(e.data); if(d.type==='chunk') updateLast(d.data); else if(d.type==='complete'){ document.getElementById('sendBtn').disabled=false; } };
+            ws.onclose = () => { document.getElementById('statusBar').textContent='Disconnected'; };
+        }
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const msg = input.value.trim();
+            if(!msg) return;
+            input.value = '';
+            appendMsg('user', msg);
+            appendMsg('ai', '');
+            if(ws && ws.readyState===1) ws.send(JSON.stringify({message: msg}));
+        }
+        function appendMsg(role, content) {
+            const chat = document.getElementById('chatArea');
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            div.innerHTML = `<div class="avatar">${role==='user'?'U':'AI'}</div><div class="content">${content}</div>`;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+            return div;
+        }
+        function updateLast(content) {
+            const msgs = document.querySelectorAll('.message.ai');
+            if(msgs.length) msgs[msgs.length-1].querySelector('.content').textContent += content;
+        }
+        function toggleSettings() {
+            document.getElementById('settingsPanel').classList.toggle('active');
+            document.getElementById('overlay').classList.toggle('active');
+        }
+        function closeSettings() { document.getElementById('settingsPanel').classList.remove('active'); document.getElementById('overlay').classList.remove('active'); }
+        function saveApiKey() {
+            fetch('/api/api-key', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({api_key:document.getElementById('apiKeyInput').value})})
+                .then(r=>r.json()).then(d=>{ alert(d.message); closeSettings(); });
+        }
+        init();
+    </script>
+</body>
+</html>
